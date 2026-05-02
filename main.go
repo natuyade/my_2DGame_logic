@@ -1,11 +1,24 @@
 package main
 
 import (
+	"image/color"
+	_ "image/png"
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
+
+var img *ebiten.Image
+
+func init() {
+	var err error
+	// NewImageFromFile(相対パス): 画像ファイルから再利用可能なebitengineImageObjectを生成
+	img, _, err = ebitenutil.NewImageFromFile("fishish.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 type Game struct{}
 
@@ -18,9 +31,13 @@ func (g *Game) Update() error {
 // インポートした全てのimage, offscreenImage(メモリ上のバッファに描画されたimage), screen(最終的に描画されている画面)
 // これらを*ebiten.Imageとして扱う
 func (g *Game) Draw(screen *ebiten.Image) {
+
+	screen.Fill(color.RGBA{0, 0xff, 0, 0xff})
+	screen.DrawImage(img, nil)
+
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
-	ebitenutil.DebugPrint(screen, "It's DebugMessage")
+	ebitenutil.DebugPrint(screen, "This is DebugMessage")
 }
 
 // windowサイズを引数で受け取り
