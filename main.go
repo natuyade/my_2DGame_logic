@@ -5,27 +5,38 @@ import (
 	_ "image/png"
 	"log"
 	"math"
+	"fmt"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-var fishimg *ebiten.Image
+var fishImg *ebiten.Image
+var playerImg *ebiten.Image
 
 type Game struct{
-	fishImage *ebiten.Image
+	keys []ebiten.Key
+	px float64
+	py float64
+	shiftPressed bool
+	moveSpeed float64
 }
 
 func init() {
 	var err error
 	// NewImageFromFile(相対パス): 画像ファイルから再利用可能なebitengineImageObjectを生成
-	fishimg, _, err = ebitenutil.NewImageFromFile("fishish.png")
+	fishImg, _, err = ebitenutil.NewImageFromFile("fishish.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	playerImg, _, err = ebitenutil.NewImageFromFile("player.png")
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func objRotate(screen *ebiten.Image, img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
+func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
 
 	// Imageのx,yは左上が原点
 	op := &ebiten.DrawImageOptions{}
@@ -51,6 +62,35 @@ func objRotate(screen *ebiten.Image, img *ebiten.Image, angle float64) *ebiten.D
 // default: 60tps
 // 毎フレーム画面リセット(クリア),描画される
 func (g *Game) Update() error {
+	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
+
+	// shift判定用
+	for _, k := range g.keys {
+		key := k.String()
+
+		if key == "Shift" {
+			g.shiftPressed = true
+		} else {
+			g.shiftPressed = false
+		}
+	}
+
+	// 移動判定用
+	for _, k := range g.keys {
+		key := k.String()
+
+		switch key {
+		case "W":
+			g.py -= g.moveSpeed
+		case "A":
+			g.px -= g.moveSpeed
+		case "S":
+			g.py += g.moveSpeed
+		case "D":
+			g.px += g.moveSpeed
+		}
+	}
+
 	return nil
 }
 
@@ -60,19 +100,32 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	screen.Fill(color.RGBA{0, 0xff, 0, 0xff})
 
-	g.fishImage = fishimg
-
-	op := objRotate(screen, g.fishImage, -math.Pi / 2)
+	op := objRotate(fishImg, -math.Pi / 2)
 
 	// 基本的にScale変更する場合, 座標移動の前にした方がやりやすい
 	op.GeoM.Scale(0.8,0.8)
 	op.GeoM.Translate(32, 32)
 
-	screen.DrawImage(g.fishImage, op)
+	screen.DrawImage(fishImg, op)
+
+	op.GeoM.Reset()
+	op.GeoM.Translate(g.px, g.py)
+
+	screen.DrawImage(playerImg, op)
+
+	var keyStrs []string
+	var keyNames []string
+
+	for _, k := range g.keys {
+		keyStrs = append(keyStrs, k.String())
+		if name := ebiten.KeyName(k); name != "" {
+			keyNames = append(keyNames, name)
+		}
+	}
 
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
-	ebitenutil.DebugPrint(screen, "This is DebugMessage")
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\n%s\nnow speed: %f\n", keyStrs, keyNames, g.moveSpeed))
 }
 
 // windowサイズを引数で受け取り
@@ -89,8 +142,16 @@ func main() {
 	// windowTitle
 	ebiten.SetWindowTitle("My first app in go language")
 
+	g := &Game{
+		keys: []ebiten.Key{},
+		px: 0,
+		py: 0,
+		shiftPressed: false,
+		moveSpeed: 0,
+	}
+
 	// Gameのメインループを実行
-	if err := ebiten.RunGame(&Game{}); err != nil {
+	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
 	}
 }
