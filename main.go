@@ -1,11 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	_ "image/png"
 	"log"
 	"math"
-	"fmt"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -17,10 +17,9 @@ var playerImg *ebiten.Image
 
 type Game struct{
 	keys []ebiten.Key
-	px float64
-	py float64
-	shiftPressed bool
-	moveSpeed float64
+	playerX float64
+	playerY float64
+	movedDebug [2]float64
 }
 
 func init() {
@@ -64,32 +63,46 @@ func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
 func (g *Game) Update() error {
 	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
 
-	// shift判定用
-	for _, k := range g.keys {
-		key := k.String()
+	// 最終的な移動量
+	resultMoved := []float64{0, 0}
+	moveSpeed := float64(1)
 
-		if key == "Shift" {
-			g.shiftPressed = true
-		} else {
-			g.shiftPressed = false
-		}
-	}
-
-	// 移動判定用
 	for _, k := range g.keys {
 		key := k.String()
 
 		switch key {
 		case "W":
-			g.py -= g.moveSpeed
+			resultMoved[1] -= 1
 		case "A":
-			g.px -= g.moveSpeed
+			resultMoved[0] -= 1
 		case "S":
-			g.py += g.moveSpeed
+			resultMoved[1] += 1
 		case "D":
-			g.px += g.moveSpeed
+			resultMoved[0] += 1
+		// Sprintの倍率
+		case "Shift":
+			moveSpeed = 3.5
 		}
 	}
+
+	// 斜めに移動する場合の処理
+	if resultMoved[0] != 0 && resultMoved[1] != 0 {
+
+		// vectorの計算(a^2+b^2=c^2)
+		v := math.Sqrt(resultMoved[0] * resultMoved[0] + resultMoved[1] * resultMoved[1])
+
+		// 移動量の計算
+		resultMoved[0] = (resultMoved[0] / v) * moveSpeed
+		resultMoved[1] = (resultMoved[1] / v) * moveSpeed
+	} else {
+		resultMoved[0] *= moveSpeed
+		resultMoved[1] *= moveSpeed
+	}
+
+	g.playerX += resultMoved[0]
+	g.playerY += resultMoved[1]
+
+	g.movedDebug = [2]float64{resultMoved[0], resultMoved[1]}
 
 	return nil
 }
@@ -109,23 +122,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(fishImg, op)
 
 	op.GeoM.Reset()
-	op.GeoM.Translate(g.px, g.py)
+	op.GeoM.Translate(g.playerX, g.playerY)
 
 	screen.DrawImage(playerImg, op)
 
-	var keyStrs []string
-	var keyNames []string
-
-	for _, k := range g.keys {
-		keyStrs = append(keyStrs, k.String())
-		if name := ebiten.KeyName(k); name != "" {
-			keyNames = append(keyNames, name)
-		}
-	}
-
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\n%s\nnow speed: %f\n", keyStrs, keyNames, g.moveSpeed))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n", g.keys, g.movedDebug[0], g.movedDebug[1]))
 }
 
 // windowサイズを引数で受け取り
@@ -144,10 +147,8 @@ func main() {
 
 	g := &Game{
 		keys: []ebiten.Key{},
-		px: 0,
-		py: 0,
-		shiftPressed: false,
-		moveSpeed: 0,
+		playerX: 0,
+		playerY: 0,
 	}
 
 	// Gameのメインループを実行
