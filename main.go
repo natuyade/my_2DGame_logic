@@ -78,7 +78,14 @@ func drawLayers() [][]int {
 
 	layers := [][]int{
 		{
-			0, 1, 2, 3, 0, 0, 1, 2, 3, 0, 0, 1, 2, 3, 0, 0, 1, 2, 3, 0,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+		},
+		{
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 4, 4, 4, 3, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		},
 	}
 	return layers
@@ -163,6 +170,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	
 	drawX := 0
 	drawY := 0
+	nowPos := [2]float64{0, 0}
 
 	screenSizeX := screen.Bounds().Dx()
 	tileSpan := screenSizeX / tileSizeX
@@ -183,11 +191,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			if tileId != 0 {
 				screen.DrawImage(images[2].SubImage(tileDir).(*ebiten.Image) , op)
 			}
+
+			// 移動先の座標を保存
+			nowPos[0], nowPos[1] = op.GeoM.Apply(float64(tileSizeX), 0)
 			op.GeoM.Translate(float64(tileSizeX), 0)
 
 			drawX += 1
 			drawY = 0
 		}
+		drawX = 0
+		op.GeoM.Translate(-nowPos[0], -nowPos[1])
 	}
 
 	op = objRotate(images[0], -math.Pi / 2)
