@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"image/color"
+	"image"
 	_ "image/png"
 	"log"
 	"math"
@@ -12,27 +12,43 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-var fishImg *ebiten.Image
-var playerImg *ebiten.Image
+var images []*ebiten.Image
+
+const (
+	windowWidth = int(1280)
+	windowHeight = int(720)
+
+	screenSizeWidth = int(256)
+	screenSizeHeight = int(220)
+
+	tileSizeX = int(16)
+	tileSizeY = int(16)
+)
 
 type Game struct{
+	layers [][]int
 	keys []ebiten.Key
 	playerX float64
 	playerY float64
 	movedDebug [2]float64
 }
 
-func init() {
-	var err error
+func loadImage(path string) *ebiten.Image {
 	// NewImageFromFile(相対パス): 画像ファイルから再利用可能なebitengineImageObjectを生成
-	fishImg, _, err = ebitenutil.NewImageFromFile("fishish.png")
+	img, _, err := ebitenutil.NewImageFromFile(path)
 	if err != nil {
 		log.Fatal(err)
 	}
-	playerImg, _, err = ebitenutil.NewImageFromFile("player.png")
-	if err != nil {
-		log.Fatal(err)
-	}
+	return img
+}
+
+func init() {
+	fishImg := loadImage("assets/images/fishish.png")
+	playerImg := loadImage("assets/images/player.png")
+	tilesImg := loadImage("assets/images/tiles.png")
+	boxImg := loadImage("assets/images/box.png")
+
+	images = append(images, fishImg, playerImg, tilesImg, boxImg)
 }
 
 func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
@@ -56,6 +72,37 @@ func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
 	op.GeoM.Translate(float64(w) / 2, float64(w) / 2)
 
 	return op
+}
+
+func drawLayers() [][]int {
+
+	layers := [][]int{
+		{
+			0, 1, 2, 3, 0, 0, 1, 2, 3, 0, 0, 1, 2, 3, 0, 0, 1, 2, 3, 0,
+		},
+	}
+	return layers
+}
+
+func convertDir(pickedNum int) [2]int {
+
+		// タイルの画像をNo.で取得できるように.
+		// ttileImageが4*4の場合
+		// 0=(0,0) 1=(16,0) 2=(32,0) 3=(48,0) 4=(0,16) 5=(16,16)...
+
+		// tileImageの横Cell数を計算
+		tileImageWidth := images[2].Bounds().Dx() / tileSizeX
+		
+		// 選択された数字に対応して,tileImageの縦何列目かを計算
+		tileY := int(math.Floor(float64(pickedNum) / float64(tileImageWidth)))
+
+		// それぞれ座標に変換
+		pickedTile := [2]int{
+			(pickedNum - (tileY * tileImageWidth)) * tileSizeX,
+			tileY * tileSizeY,
+		}
+		
+		return pickedTile
 }
 
 // default: 60tps
@@ -111,20 +158,51 @@ func (g *Game) Update() error {
 // これらを*ebiten.Imageとして扱う
 func (g *Game) Draw(screen *ebiten.Image) {
 
-	screen.Fill(color.RGBA{0, 0xff, 0, 0xff})
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Reset()
+	
+	drawX := 0
+	drawY := 0
 
-	op := objRotate(fishImg, -math.Pi / 2)
+	screenSizeX := screen.Bounds().Dx()
+	tileSpan := screenSizeX / tileSizeX
+	
+	for _, y := range g.layers {
+		for _, x := range y {
+			tileId := x
+			// 0の場合描画しないようにするため-1(tile描画を1~に)
+			pickedTile := convertDir(tileId - 1)
+			tileDir := image.Rect(pickedTile[0], pickedTile[1], pickedTile[0]+tileSizeX, pickedTile[1]+tileSizeY)
+
+			if drawX == tileSpan {
+				drawY += tileSizeY
+				drawX = 0
+				op.GeoM.Translate(-float64(screenSizeX), float64(drawY))
+			}
+
+			if tileId != 0 {
+				screen.DrawImage(images[2].SubImage(tileDir).(*ebiten.Image) , op)
+			}
+			op.GeoM.Translate(float64(tileSizeX), 0)
+
+			drawX += 1
+			drawY = 0
+		}
+	}
+
+	op = objRotate(images[0], -math.Pi / 2)
 
 	// 基本的にScale変更する場合, 座標移動の前にした方がやりやすい
 	op.GeoM.Scale(0.8,0.8)
+	op.GeoM.Scale(0.,0.)
 	op.GeoM.Translate(32, 32)
 
-	screen.DrawImage(fishImg, op)
+	screen.DrawImage(images[0], op)
 
 	op.GeoM.Reset()
 	op.GeoM.Translate(g.playerX, g.playerY)
 
-	screen.DrawImage(playerImg, op)
+	screen.DrawImage(images[1], op)
 
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
@@ -136,16 +214,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
 	// 今のコードは,固定値を入れることで
 	// Windowサイズに関係なくゲーム画面のサイズを固定している
-	return 320, 240
+	return screenSizeWidth, screenSizeHeight
 }
 
 func main() {
 	// window表示時のサイズ指定
-	ebiten.SetWindowSize(640, 480)
+	ebiten.SetWindowSize(windowWidth, windowHeight)
 	// windowTitle
 	ebiten.SetWindowTitle("My first app in go language")
 
+	layers := drawLayers()
+
 	g := &Game{
+		layers: layers,
 		keys: []ebiten.Key{},
 		playerX: 0,
 		playerY: 0,
