@@ -30,6 +30,7 @@ type Game struct{
 	keys []ebiten.Key
 	playerX float64
 	playerY float64
+	playerLookAt int
 	movedDebug [2]float64
 }
 
@@ -77,15 +78,56 @@ func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
 func drawLayers() [][]int {
 
 	layers := [][]int{
+		// 地面
 		{
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
 			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
 			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2,
 		},
+		// 当たり判定無しobj
 		{
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 4, 4, 4, 3, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		},
+		// 当たり判定有
+		{
+			6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 		},
 	}
 	return layers
@@ -112,51 +154,61 @@ func convertDir(pickedNum int) [2]int {
 		return pickedTile
 }
 
-// default: 60tps
-// 毎フレーム画面リセット(クリア),描画される
-func (g *Game) Update() error {
-	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
+func moveVector(keys []ebiten.Key) [2]float64 {
 
 	// 最終的な移動量
-	resultMoved := []float64{0, 0}
+	result := []float64{0, 0}
 	moveSpeed := float64(1)
 
-	for _, k := range g.keys {
-		key := k.String()
+	for _, k := range keys {
 
-		switch key {
-		case "W":
-			resultMoved[1] -= 1
-		case "A":
-			resultMoved[0] -= 1
-		case "S":
-			resultMoved[1] += 1
-		case "D":
-			resultMoved[0] += 1
+		switch k {
+		case ebiten.KeyW:
+			result[1] -= 1
+		case ebiten.KeyA:
+			result[0] -= 1
+		case ebiten.KeyS:
+			result[1] += 1
+		case ebiten.KeyD:
+			result[0] += 1
 		// Sprintの倍率
-		case "Shift":
+		case ebiten.KeyShiftLeft:
 			moveSpeed = 3.5
 		}
 	}
 
 	// 斜めに移動する場合の処理
-	if resultMoved[0] != 0 && resultMoved[1] != 0 {
+	if result[0] != 0 && result[1] != 0 {
 
 		// vectorの計算(a^2+b^2=c^2)
-		v := math.Sqrt(resultMoved[0] * resultMoved[0] + resultMoved[1] * resultMoved[1])
+		v := math.Sqrt(result[0] * result[0] + result[1] * result[1])
 
-		// 移動量の計算
-		resultMoved[0] = (resultMoved[0] / v) * moveSpeed
-		resultMoved[1] = (resultMoved[1] / v) * moveSpeed
+		// 移動量の最終計算
+		result[0] = (result[0] / v) * moveSpeed
+		result[1] = (result[1] / v) * moveSpeed
 	} else {
-		resultMoved[0] *= moveSpeed
-		resultMoved[1] *= moveSpeed
+		result[0] *= moveSpeed
+		result[1] *= moveSpeed
 	}
+
+	return [2]float64{result[0], result[1]}
+}
+
+// default: 60tps
+// 毎フレーム画面リセット(クリア),描画される
+func (g *Game) Update() error {
+	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
+
+	// ベクトル計算
+	resultMoved := moveVector(g.keys)
 
 	g.playerX += resultMoved[0]
 	g.playerY += resultMoved[1]
-
 	g.movedDebug = [2]float64{resultMoved[0], resultMoved[1]}
+
+	if resultMoved[0] < 0 {
+		
+	}
 
 	return nil
 }
@@ -207,14 +259,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// 基本的にScale変更する場合, 座標移動の前にした方がやりやすい
 	op.GeoM.Scale(0.8,0.8)
-	op.GeoM.Scale(0.,0.)
 	op.GeoM.Translate(32, 32)
-
-	screen.DrawImage(images[0], op)
+	//screen.DrawImage(images[0], op)
 
 	op.GeoM.Reset()
-	op.GeoM.Translate(g.playerX, g.playerY)
-
+	
+	// 移動方向によってImageを反転
+	for _, key := range g.keys {
+		switch key {
+		case ebiten.KeyA:
+			g.playerLookAt = 1
+		case ebiten.KeyD:
+			g.playerLookAt = 2
+		}
+	}
+	
+	switch g.playerLookAt {
+	case 1:
+		op.GeoM.Scale(1, 1)
+		op.GeoM.Translate(g.playerX, g.playerY)
+	case 2:
+		op.GeoM.Scale(-1, 1)
+		op.GeoM.Translate(float64(images[1].Bounds().Dx())+g.playerX, g.playerY)
+	}
+	
+	// Draw Player Image
 	screen.DrawImage(images[1], op)
 
 	// 画面上にdebugメッセージを描画するutility関数
@@ -241,8 +310,9 @@ func main() {
 	g := &Game{
 		layers: layers,
 		keys: []ebiten.Key{},
-		playerX: 0,
-		playerY: 0,
+		playerX: 64,
+		playerY: 48,
+		playerLookAt: 2,
 	}
 
 	// Gameのメインループを実行
