@@ -15,23 +15,26 @@ import (
 var images []*ebiten.Image
 
 const (
-	windowWidth = int(1280)
+	windowWidth  = int(1280)
 	windowHeight = int(720)
 
-	screenSizeWidth = int(256)
-	screenSizeHeight = int(220)
+	screenSizeWidth  = int(256)
+	screenSizeHeight = int(224)
 
 	tileSizeX = int(16)
 	tileSizeY = int(16)
 )
 
-type Game struct{
-	layers [][]int
-	keys []ebiten.Key
-	playerX float64
-	playerY float64
-	playerLookAt int
-	movedDebug [2]float64
+type Game struct {
+	layers        [][]int
+	keys          []ebiten.Key
+	playerX       float64
+	playerY       float64
+	playerLookAt  int
+	player2X      float64
+	player2Y      float64
+	player2LookAt int
+	movedDebug    [2]float64
 }
 
 func loadImage(path string) *ebiten.Image {
@@ -56,21 +59,21 @@ func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
 
 	// Imageのx,yは左上が原点
 	op := &ebiten.DrawImageOptions{}
-	
+
 	// Boundsは画像の左上, 右下の座標を持ったRectangle
 	// Dx,DyでRectangleの横幅, 縦幅を取得
 	w := img.Bounds().Dx()
-    h := img.Bounds().Dy()
+	h := img.Bounds().Dy()
 
 	// 画像の中心の座標を原点に移動
-	op.GeoM.Translate(-float64(w) / 2, -float64(h) / 2)
+	op.GeoM.Translate(-float64(w)/2, -float64(h)/2)
 
 	// 原点で回転する為, 移動後の画像の中心を原点に移動し回転することで
 	// 回転後の座標計算をなくせる
 	op.GeoM.Rotate(angle)
-	
+
 	// 左上基準に戻す
-	op.GeoM.Translate(float64(w) / 2, float64(w) / 2)
+	op.GeoM.Translate(float64(w)/2, float64(w)/2)
 
 	return op
 }
@@ -135,53 +138,32 @@ func drawLayers() [][]int {
 
 func convertDir(pickedNum int) [2]int {
 
-		// タイルの画像をNo.で取得できるように.
-		// ttileImageが4*4の場合
-		// 0=(0,0) 1=(16,0) 2=(32,0) 3=(48,0) 4=(0,16) 5=(16,16)...
+	// タイルの画像をNo.で取得できるように.
+	// ttileImageが4*4の場合
+	// 0=(0,0) 1=(16,0) 2=(32,0) 3=(48,0) 4=(0,16) 5=(16,16)...
 
-		// tileImageの横Cell数を計算
-		tileImageWidth := images[2].Bounds().Dx() / tileSizeX
-		
-		// 選択された数字に対応して,tileImageの縦何列目かを計算
-		tileY := int(math.Floor(float64(pickedNum) / float64(tileImageWidth)))
+	// tileImageの横Cell数を計算
+	tileImageWidth := images[2].Bounds().Dx() / tileSizeX
 
-		// それぞれ座標に変換
-		pickedTile := [2]int{
-			(pickedNum - (tileY * tileImageWidth)) * tileSizeX,
-			tileY * tileSizeY,
-		}
-		
-		return pickedTile
+	// 選択された数字に対応して,tileImageの縦何列目かを計算
+	tileY := int(math.Floor(float64(pickedNum) / float64(tileImageWidth)))
+
+	// それぞれ座標に変換
+	pickedTile := [2]int{
+		(pickedNum - (tileY * tileImageWidth)) * tileSizeX,
+		tileY * tileSizeY,
+	}
+
+	return pickedTile
 }
 
-func moveVector(keys []ebiten.Key) [2]float64 {
-
-	// 最終的な移動量
-	result := []float64{0, 0}
-	moveSpeed := float64(1)
-
-	for _, k := range keys {
-
-		switch k {
-		case ebiten.KeyW:
-			result[1] -= 1
-		case ebiten.KeyA:
-			result[0] -= 1
-		case ebiten.KeyS:
-			result[1] += 1
-		case ebiten.KeyD:
-			result[0] += 1
-		// Sprintの倍率
-		case ebiten.KeyShiftLeft:
-			moveSpeed = 3.5
-		}
-	}
+func moveVector(result [2]float64, moveSpeed float64) [2]float64 {
 
 	// 斜めに移動する場合の処理
 	if result[0] != 0 && result[1] != 0 {
 
 		// vectorの計算(a^2+b^2=c^2)
-		v := math.Sqrt(result[0] * result[0] + result[1] * result[1])
+		v := math.Sqrt(result[0]*result[0] + result[1]*result[1])
 
 		// 移動量の最終計算
 		result[0] = (result[0] / v) * moveSpeed
@@ -199,16 +181,93 @@ func moveVector(keys []ebiten.Key) [2]float64 {
 func (g *Game) Update() error {
 	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
 
+	// 最終的な移動量
+	result := [2]float64{0, 0}
+	moveSpeed := float64(1)
+
+	for _, k := range g.keys {
+
+		switch k {
+			// 僕が考えた最強のコリジョンコード
+		case ebiten.KeyW:
+			if g.playerY > g.player2Y &&
+				g.playerY-g.player2Y <= 16+moveSpeed &&
+				g.playerX-g.player2X < 16 &&
+				g.playerX-g.player2X > -16 {
+				result[1] -= g.playerY - (g.player2Y + 16)
+			} else {
+				result[1] -= 1
+			}
+		case ebiten.KeyA:
+			if g.playerX > g.player2X &&
+				g.playerX-g.player2X <= 16+moveSpeed &&
+				g.playerY-g.player2Y < 16 &&
+				g.playerY-g.player2Y > -16 {
+				result[0] -= g.playerX - (g.player2X + 16)
+			} else {
+				result[0] -= 1
+			}
+		case ebiten.KeyS:
+			if g.playerY < g.player2Y &&
+				g.playerY-g.player2Y >= -16-moveSpeed &&
+				g.playerX-g.player2X < 16 &&
+				g.playerX-g.player2X > -16 {
+				result[1] -= g.playerY - (g.player2Y + -16)
+			} else {
+				result[1] += 1
+			}
+		case ebiten.KeyD:
+			if g.playerX < g.player2X &&
+				g.playerX-g.player2X >= -16-moveSpeed &&
+				g.playerY-g.player2Y < 16 &&
+				g.playerY-g.player2Y > -16 {
+				result[0] -= g.playerX - (g.player2X + -16)
+			} else {
+				result[0] += 1
+			}
+		// Sprintの倍率
+		case ebiten.KeyShiftLeft:
+			moveSpeed = 3.5
+		}
+	}
+
 	// ベクトル計算
-	resultMoved := moveVector(g.keys)
+	resultMoved := moveVector(result, moveSpeed)
+
+	// colision test
+	//if g.playerX-g.player2X > -16-moveSpeed && g.playerX-g.player2X < 16+moveSpeed && g.playerY-g.player2Y < 16 && g.playerY-g.player2Y > -16 {
+	//	resultMoved[0] += ((g.playerX + resultMoved[0]) - g.player2X) / 16
+	//	resultMoved[1] += ((g.playerY + resultMoved[1]) - g.player2Y) / 16
+	//}
 
 	g.playerX += resultMoved[0]
 	g.playerY += resultMoved[1]
 	g.movedDebug = [2]float64{resultMoved[0], resultMoved[1]}
 
-	if resultMoved[0] < 0 {
-		
+	// 2p debug
+	result2P := [2]float64{0, 0}
+	moveSpeed2P := float64(1)
+
+	for _, k := range g.keys {
+
+		switch k {
+		case ebiten.KeyArrowUp:
+			result2P[1] -= 1
+		case ebiten.KeyArrowLeft:
+			result2P[0] -= 1
+		case ebiten.KeyArrowDown:
+			result2P[1] += 1
+		case ebiten.KeyArrowRight:
+			result2P[0] += 1
+		case ebiten.KeyShiftRight:
+			moveSpeed2P = 3.5
+		}
 	}
+
+	resultMoved2P := moveVector(result2P, moveSpeed2P)
+
+	g.player2X += resultMoved2P[0]
+	g.player2Y += resultMoved2P[1]
 
 	return nil
 }
@@ -219,14 +278,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Reset()
-	
+
 	drawX := 0
 	drawY := 0
 	nowPos := [2]float64{0, 0}
 
 	screenSizeX := screen.Bounds().Dx()
 	tileSpan := screenSizeX / tileSizeX
-	
+
 	for _, y := range g.layers {
 		for _, x := range y {
 			tileId := x
@@ -241,7 +300,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			}
 
 			if tileId != 0 {
-				screen.DrawImage(images[2].SubImage(tileDir).(*ebiten.Image) , op)
+				screen.DrawImage(images[2].SubImage(tileDir).(*ebiten.Image), op)
 			}
 
 			// 移動先の座標を保存
@@ -255,15 +314,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		op.GeoM.Translate(-nowPos[0], -nowPos[1])
 	}
 
-	op = objRotate(images[0], -math.Pi / 2)
+	op = objRotate(images[0], -math.Pi/2)
 
 	// 基本的にScale変更する場合, 座標移動の前にした方がやりやすい
-	op.GeoM.Scale(0.8,0.8)
+	op.GeoM.Scale(0.8, 0.8)
 	op.GeoM.Translate(32, 32)
 	//screen.DrawImage(images[0], op)
 
 	op.GeoM.Reset()
-	
+
 	// 移動方向によってImageを反転
 	for _, key := range g.keys {
 		switch key {
@@ -273,7 +332,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			g.playerLookAt = 2
 		}
 	}
-	
+
 	switch g.playerLookAt {
 	case 1:
 		op.GeoM.Scale(1, 1)
@@ -282,13 +341,35 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		op.GeoM.Scale(-1, 1)
 		op.GeoM.Translate(float64(images[1].Bounds().Dx())+g.playerX, g.playerY)
 	}
-	
+
 	// Draw Player Image
-	screen.DrawImage(images[1], op)
+	screen.DrawImage(images[3], op)
+
+	// 2p debug
+	op.GeoM.Reset()
+	for _, key := range g.keys {
+		switch key {
+		case ebiten.KeyArrowLeft:
+			g.player2LookAt = 1
+		case ebiten.KeyArrowRight:
+			g.player2LookAt = 2
+		}
+	}
+	switch g.player2LookAt {
+	case 1:
+		op.GeoM.Scale(1, 1)
+		op.GeoM.Translate(g.player2X, g.player2Y)
+	case 2:
+		op.GeoM.Scale(-1, 1)
+		op.GeoM.Translate(float64(images[1].Bounds().Dx())+g.player2X, g.player2Y)
+	}
+
+	screen.DrawImage(images[3], op)
 
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n", g.keys, g.movedDebug[0], g.movedDebug[1]))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]\n2p\n[%f]\n[%f]", g.keys, g.movedDebug[0], g.movedDebug[1], g.playerX, g.playerY, g.player2X, g.player2Y))
+
 }
 
 // windowサイズを引数で受け取り
@@ -308,11 +389,14 @@ func main() {
 	layers := drawLayers()
 
 	g := &Game{
-		layers: layers,
-		keys: []ebiten.Key{},
-		playerX: 64,
-		playerY: 48,
-		playerLookAt: 2,
+		layers:        layers,
+		keys:          []ebiten.Key{},
+		playerX:       64,
+		playerY:       48,
+		playerLookAt:  2,
+		player2X:      128,
+		player2Y:      48,
+		player2LookAt: 2,
 	}
 
 	// Gameのメインループを実行
