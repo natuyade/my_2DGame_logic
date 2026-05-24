@@ -186,8 +186,7 @@ func moveVector(result [2]float64, moveSpeed float64) [2]float64 {
 // 毎フレーム画面リセット(クリア),描画される
 func (g *Game) Update() error {
 	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
-	g.cols = append(g.cols, Colision{g.player2X, g.player2Y})
-	g.cols = append(g.cols, Colision{128, 128})
+	g.cols[0] = Colision{g.player2X, g.player2Y}
 
 	// 最終的な移動量
 	result := [2]float64{0, 0}
@@ -450,6 +449,11 @@ func main() {
 		player2Y:      48,
 		player2LookAt: 2,
 	}
+	g.cols = append(g.cols, Colision{g.player2X, g.player2Y})
+	g.cols = append(g.cols, Colision{128, 128})
+	g.cols = append(g.cols, Colision{256, 128})
+	g.cols = append(g.cols, Colision{128, 256})
+	g.cols = append(g.cols, Colision{256, 256})
 
 	// Gameのメインループを実行
 	if err := ebiten.RunGame(g); err != nil {
