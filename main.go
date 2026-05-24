@@ -35,6 +35,12 @@ type Game struct {
 	player2Y      float64
 	player2LookAt int
 	movedDebug    [2]float64
+	cols		  []Colision
+}
+
+type Colision struct {
+	x float64
+	y float64
 }
 
 func loadImage(path string) *ebiten.Image {
@@ -180,6 +186,8 @@ func moveVector(result [2]float64, moveSpeed float64) [2]float64 {
 // 毎フレーム画面リセット(クリア),描画される
 func (g *Game) Update() error {
 	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
+	g.cols = append(g.cols, Colision{g.player2X, g.player2Y})
+	g.cols = append(g.cols, Colision{128, 128})
 
 	// 最終的な移動量
 	result := [2]float64{0, 0}
@@ -187,47 +195,86 @@ func (g *Game) Update() error {
 
 	for _, k := range g.keys {
 
+		// Sprintの倍率
 		switch k {
-			// 僕が考えた最強のコリジョンコード
+		case ebiten.KeyShiftLeft:
+			moveSpeed = 3.5
+		}
+
+		beingColision := false
+		var colision [2]float64
+
+		switch k {
+		// 僕が考えた最強のコリジョンコード
 		case ebiten.KeyW:
-			if g.playerY > g.player2Y &&
-				g.playerY-g.player2Y <= 16+moveSpeed &&
-				g.playerX-g.player2X < 16 &&
-				g.playerX-g.player2X > -16 {
-				result[1] -= g.playerY - (g.player2Y + 16)
+			for _, col := range g.cols {
+				
+				if g.playerY > col.y &&
+				// おまもりコードの+1君
+					g.playerY-col.y <= float64(tileSizeX + 1) &&
+					g.playerX-col.x < float64(tileSizeX) &&
+					g.playerX-col.x > -float64(tileSizeX) {
+						colision = [2]float64{col.x, col.y}
+						beingColision = true
+					}
+			}
+
+			if beingColision {
+				result[1] -= g.playerY - (colision[1] + float64(tileSizeX))
 			} else {
 				result[1] -= 1
 			}
 		case ebiten.KeyA:
-			if g.playerX > g.player2X &&
-				g.playerX-g.player2X <= 16+moveSpeed &&
-				g.playerY-g.player2Y < 16 &&
-				g.playerY-g.player2Y > -16 {
-				result[0] -= g.playerX - (g.player2X + 16)
+			for _, col := range g.cols {
+				
+				if g.playerX > col.x &&
+					g.playerX-col.x <= float64(tileSizeX + 1) &&
+					g.playerY-col.y < float64(tileSizeX) &&
+					g.playerY-col.y > -float64(tileSizeX) {
+						colision = [2]float64{col.x, col.y}
+						beingColision = true
+					}
+			}
+
+			if beingColision {
+				result[0] -= g.playerX - (colision[0] + float64(tileSizeX))
 			} else {
 				result[0] -= 1
 			}
 		case ebiten.KeyS:
-			if g.playerY < g.player2Y &&
-				g.playerY-g.player2Y >= -16-moveSpeed &&
-				g.playerX-g.player2X < 16 &&
-				g.playerX-g.player2X > -16 {
-				result[1] -= g.playerY - (g.player2Y + -16)
+			for _, col := range g.cols {
+				
+				if g.playerY < col.y &&
+					g.playerY-col.y >= -float64(tileSizeX + 1) &&
+					g.playerX-col.x < float64(tileSizeX) &&
+					g.playerX-col.x > -float64(tileSizeX) {
+						colision = [2]float64{col.x, col.y}
+						beingColision = true
+					}
+			}
+
+			if beingColision {
+				result[1] -= g.playerY - (colision[1] - float64(tileSizeX))
 			} else {
 				result[1] += 1
 			}
 		case ebiten.KeyD:
-			if g.playerX < g.player2X &&
-				g.playerX-g.player2X >= -16-moveSpeed &&
-				g.playerY-g.player2Y < 16 &&
-				g.playerY-g.player2Y > -16 {
-				result[0] -= g.playerX - (g.player2X + -16)
+			for _, col := range g.cols {
+				
+				if g.playerX < col.x &&
+					g.playerX-col.x >= -float64(tileSizeX + 1) &&
+					g.playerY-col.y < float64(tileSizeX) &&
+					g.playerY-col.y > -float64(tileSizeX) {
+						colision = [2]float64{col.x, col.y}
+						beingColision = true
+					}
+			}
+
+			if beingColision {
+				result[0] -= g.playerX - (colision[0] - float64(tileSizeX))
 			} else {
 				result[0] += 1
 			}
-		// Sprintの倍率
-		case ebiten.KeyShiftLeft:
-			moveSpeed = 3.5
 		}
 	}
 
@@ -364,6 +411,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		op.GeoM.Translate(float64(images[1].Bounds().Dx())+g.player2X, g.player2Y)
 	}
 
+	screen.DrawImage(images[3], op)
+
+	// box for debug colision
+	op.GeoM.Reset()
+	op.GeoM.Translate(128, 128)
 	screen.DrawImage(images[3], op)
 
 	// 画面上にdebugメッセージを描画するutility関数
