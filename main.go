@@ -35,7 +35,7 @@ type Game struct {
 	player2Y      float64
 	player2LookAt int
 	movedDebug    [2]float64
-	cols		  []Colision
+	cols          []Colision
 }
 
 type Colision struct {
@@ -190,7 +190,8 @@ func (g *Game) Update() error {
 
 	// 最終的な移動量
 	result := [2]float64{0, 0}
-	moveSpeed := float64(1)
+	moveValue := 1.
+	moveSpeed := 1.
 
 	for _, k := range g.keys {
 
@@ -207,84 +208,77 @@ func (g *Game) Update() error {
 		// 僕が考えた最強のコリジョンコード
 		case ebiten.KeyW:
 			for _, col := range g.cols {
-				
+
 				if g.playerY > col.y &&
-				// おまもりコードの+1君
-					g.playerY-col.y <= float64(tileSizeX + 1) &&
+					(g.playerY-(moveValue*moveSpeed))-col.y <= float64(tileSizeY) &&
 					g.playerX-col.x < float64(tileSizeX) &&
 					g.playerX-col.x > -float64(tileSizeX) {
-						colision = [2]float64{col.x, col.y}
-						beingColision = true
-					}
+					colision = [2]float64{col.x, col.y}
+					beingColision = true
+				}
 			}
 
 			if beingColision {
-				result[1] -= g.playerY - (colision[1] + float64(tileSizeX))
+				result[1] -= g.playerY - (colision[1] + float64(tileSizeY))
 			} else {
-				result[1] -= 1
+				result[1] -= moveValue
 			}
 		case ebiten.KeyA:
 			for _, col := range g.cols {
-				
+
 				if g.playerX > col.x &&
-					g.playerX-col.x <= float64(tileSizeX + 1) &&
-					g.playerY-col.y < float64(tileSizeX) &&
-					g.playerY-col.y > -float64(tileSizeX) {
-						colision = [2]float64{col.x, col.y}
-						beingColision = true
-					}
+					(g.playerX-(moveValue*moveSpeed))-col.x <= float64(tileSizeX) &&
+					g.playerY-col.y < float64(tileSizeY) &&
+					g.playerY-col.y > -float64(tileSizeY) {
+					colision = [2]float64{col.x, col.y}
+					beingColision = true
+				}
 			}
 
 			if beingColision {
 				result[0] -= g.playerX - (colision[0] + float64(tileSizeX))
 			} else {
-				result[0] -= 1
+				result[0] -= moveValue
 			}
 		case ebiten.KeyS:
 			for _, col := range g.cols {
-				
+
 				if g.playerY < col.y &&
-					g.playerY-col.y >= -float64(tileSizeX + 1) &&
+					(g.playerY+(moveValue*moveSpeed))-col.y >= -float64(tileSizeY) &&
 					g.playerX-col.x < float64(tileSizeX) &&
 					g.playerX-col.x > -float64(tileSizeX) {
-						colision = [2]float64{col.x, col.y}
-						beingColision = true
-					}
+					colision = [2]float64{col.x, col.y}
+					beingColision = true
+				}
 			}
 
 			if beingColision {
-				result[1] -= g.playerY - (colision[1] - float64(tileSizeX))
+				result[1] -= g.playerY - (colision[1] - float64(tileSizeY))
 			} else {
-				result[1] += 1
+				result[1] += moveValue
 			}
 		case ebiten.KeyD:
 			for _, col := range g.cols {
-				
+
 				if g.playerX < col.x &&
-					g.playerX-col.x >= -float64(tileSizeX + 1) &&
-					g.playerY-col.y < float64(tileSizeX) &&
-					g.playerY-col.y > -float64(tileSizeX) {
-						colision = [2]float64{col.x, col.y}
-						beingColision = true
-					}
+					(g.playerX+(moveValue*moveSpeed))-col.x >= -float64(tileSizeX) &&
+					g.playerY-col.y < float64(tileSizeY) &&
+					g.playerY-col.y > -float64(tileSizeY) {
+					colision = [2]float64{col.x, col.y}
+					beingColision = true
+				}
 			}
 
 			if beingColision {
 				result[0] -= g.playerX - (colision[0] - float64(tileSizeX))
 			} else {
-				result[0] += 1
+				result[0] += moveValue
 			}
 		}
 	}
 
 	// ベクトル計算
 	resultMoved := moveVector(result, moveSpeed)
-
-	// colision test
-	//if g.playerX-g.player2X > -16-moveSpeed && g.playerX-g.player2X < 16+moveSpeed && g.playerY-g.player2Y < 16 && g.playerY-g.player2Y > -16 {
-	//	resultMoved[0] += ((g.playerX + resultMoved[0]) - g.player2X) / 16
-	//	resultMoved[1] += ((g.playerY + resultMoved[1]) - g.player2Y) / 16
-	//}
 
 	g.playerX += resultMoved[0]
 	g.playerY += resultMoved[1]
@@ -451,9 +445,25 @@ func main() {
 	}
 	g.cols = append(g.cols, Colision{g.player2X, g.player2Y})
 	g.cols = append(g.cols, Colision{128, 128})
-	g.cols = append(g.cols, Colision{256, 128})
-	g.cols = append(g.cols, Colision{128, 256})
-	g.cols = append(g.cols, Colision{256, 256})
+
+	if len(layers) <= 3 {
+
+		span := float64(screenSizeWidth / tileSizeX)
+		row := 0.
+		column := 0.
+
+		// layer[3]で置いたタイルをColision付objとして扱うためのappend
+		for _, t := range layers[2] {
+			if t != 0 {
+				g.cols = append(g.cols, Colision{column * float64(tileSizeX), row * float64(tileSizeY)})
+			}
+			column += 1
+			if column == span {
+				column = 0
+				row += 1
+			}
+		}
+	}
 
 	// Gameのメインループを実行
 	if err := ebiten.RunGame(g); err != nil {
