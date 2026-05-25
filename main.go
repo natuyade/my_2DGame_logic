@@ -193,13 +193,12 @@ func (g *Game) Update() error {
 	moveValue := 1.
 	moveSpeed := 1.
 
-	for _, k := range g.keys {
+	// Sprintの倍率
+	if ebiten.IsKeyPressed(ebiten.KeyShiftLeft) {
+		moveSpeed = 3.5
+	}
 
-		// Sprintの倍率
-		switch k {
-		case ebiten.KeyShiftLeft:
-			moveSpeed = 3.5
-		}
+	for _, k := range g.keys {
 
 		beingColision := false
 		var colision [2]float64
@@ -219,7 +218,8 @@ func (g *Game) Update() error {
 			}
 
 			if beingColision {
-				result[1] -= g.playerY - (colision[1] + float64(tileSizeY))
+				moveTo := ((g.playerY - (colision[1] + float64(tileSizeY)))) / moveSpeed
+				result[1] -= moveTo
 			} else {
 				result[1] -= moveValue
 			}
@@ -236,7 +236,7 @@ func (g *Game) Update() error {
 			}
 
 			if beingColision {
-				result[0] -= g.playerX - (colision[0] + float64(tileSizeX))
+				result[0] -= ((g.playerX - (colision[0] + float64(tileSizeX)))) / moveSpeed
 			} else {
 				result[0] -= moveValue
 			}
@@ -253,7 +253,7 @@ func (g *Game) Update() error {
 			}
 
 			if beingColision {
-				result[1] -= g.playerY - (colision[1] - float64(tileSizeY))
+				result[1] -= ((g.playerY - (colision[1] - float64(tileSizeY)))) / moveSpeed
 			} else {
 				result[1] += moveValue
 			}
@@ -270,7 +270,7 @@ func (g *Game) Update() error {
 			}
 
 			if beingColision {
-				result[0] -= g.playerX - (colision[0] - float64(tileSizeX))
+				result[0] -= ((g.playerX - (colision[0] - float64(tileSizeX)))) / moveSpeed
 			} else {
 				result[0] += moveValue
 			}
