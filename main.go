@@ -29,9 +29,6 @@ type Game struct {
 	layers        [][]int
 	keys          []ebiten.Key
 	player        playerData
-	player2X      float64
-	player2Y      float64
-	player2LookAt int
 	movedDebug    [2]float64
 	cols          []colision
 	iaObjs        []interactiveObj
@@ -149,7 +146,7 @@ func drawLayers() [][]int {
 		{
 			6, 6, 6, 6, 9, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
@@ -212,11 +209,9 @@ func (g *Game) Update() error {
 	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
 
 	// interaction処理
-	if ebiten.IsKeyPressed(ebiten.KeyE) {
-		intractTo(g.iaObjs, g.player, tileSizeX, tileSizeY)
+	if inpututil.IsKeyJustPressed(ebiten.KeyE) {
+		intractTo(g.layers, g.iaObjs, g.player, tileSizeX, tileSizeY)
 	}
-
-	g.cols[0] = colision{g.player2X, g.player2Y}
 
 	// 最終的な移動量
 	result := [2]float64{0, 0}
@@ -315,31 +310,6 @@ func (g *Game) Update() error {
 	g.player.y += resultMoved[1]
 	g.movedDebug = [2]float64{resultMoved[0], resultMoved[1]}
 
-	// 2p debug
-	result2P := [2]float64{0, 0}
-	moveSpeed2P := float64(1)
-
-	for _, k := range g.keys {
-
-		switch k {
-		case ebiten.KeyArrowUp:
-			result2P[1] -= 1
-		case ebiten.KeyArrowLeft:
-			result2P[0] -= 1
-		case ebiten.KeyArrowDown:
-			result2P[1] += 1
-		case ebiten.KeyArrowRight:
-			result2P[0] += 1
-		case ebiten.KeyShiftRight:
-			moveSpeed2P = 3.5
-		}
-	}
-
-	resultMoved2P := moveVector(result2P, moveSpeed2P)
-
-	g.player2X += resultMoved2P[0]
-	g.player2Y += resultMoved2P[1]
-
 	return nil
 }
 
@@ -436,30 +406,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw Player Image
 	screen.DrawImage(images[1].SubImage(pickAtlas).(*ebiten.Image), op)
 
-	// 2p debug
-	op.GeoM.Reset()
-	for _, key := range g.keys {
-		switch key {
-		case ebiten.KeyArrowLeft:
-			g.player2LookAt = 1
-		case ebiten.KeyArrowRight:
-			g.player2LookAt = 2
-		}
-	}
-	switch g.player2LookAt {
-	case 1:
-		op.GeoM.Scale(1, 1)
-		op.GeoM.Translate(g.player2X, g.player2Y)
-	case 2:
-		op.GeoM.Scale(-1, 1)
-		op.GeoM.Translate(float64(playerImageWidth)+g.player2X, g.player2Y)
-	}
-
-	screen.DrawImage(images[3], op)
-
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]\n2p\n[%f]\n[%f]", g.keys, g.movedDebug[0], g.movedDebug[1], g.player.x, g.player.y, g.player2X, g.player2Y))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]", g.keys, g.movedDebug[0], g.movedDebug[1], g.player.x, g.player.y))
 
 }
 
@@ -482,22 +431,17 @@ func main() {
 	g := &Game{
 		layers:        layers,
 		keys:          []ebiten.Key{},
-		player2X:      128,
-		player2Y:      48,
-		player2LookAt: 2,
 	}
 
 	g.player = playerData{64, 48, 2}
 
-	boxContaingEntranceKeyIa := interactiveObj{128, 48, false}
-	LockedDoorIa := interactiveObj{0, 64, false}
+	boxContaingEntranceKeyIa := interactiveObj{160, 32, false}
+	LockedDoorIa := interactiveObj{64, 0, false}
 
 	g.iaObjs = append(g.iaObjs,
 		boxContaingEntranceKeyIa,
 		LockedDoorIa,
 	)
-
-	g.cols = append(g.cols, colision{g.player2X, g.player2Y})
 
 	if len(layers) <= 3 {
 
