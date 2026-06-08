@@ -28,19 +28,35 @@ const (
 type Game struct {
 	layers        [][]int
 	keys          []ebiten.Key
-	playerX       float64
-	playerY       float64
-	playerLookAt  int
+	player        playerData
 	player2X      float64
 	player2Y      float64
 	player2LookAt int
 	movedDebug    [2]float64
-	cols          []Colision
+	cols          []colision
+	iaObjs        []interactiveObj
+	frags         eventFrags
 }
 
-type Colision struct {
+type playerData struct {
 	x float64
 	y float64
+	lookAt int
+}
+
+type colision struct {
+	x float64
+	y float64
+}
+
+type interactiveObj struct {
+	x float64
+	y float64
+	used bool
+}
+
+type eventFrags struct {
+	entranceKey bool
 }
 
 func loadImage(path string) *ebiten.Image {
@@ -61,6 +77,14 @@ func init() {
 	images = append(images, fishImg, playerImg, tilesImg, boxImg)
 }
 
+func inputIaObj(objs []interactiveObj) {
+
+	objs = append(objs,
+		interactiveObj{x: 0,y: 0, used: false},//
+		interactiveObj{x: 0,y: 1, used: false},
+	)
+}
+
 func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
 
 	// Imageのx,yは左上が原点
@@ -76,7 +100,7 @@ func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
 
 	// 原点で回転する為, 移動後の画像の中心を原点に移動し回転することで
 	// 回転後の座標計算をなくせる
-	op.GeoM.Rotate(angle)
+	op.GeoM.Rotate(angle)        
 
 	// 左上基準に戻す
 	op.GeoM.Translate(float64(w)/2, float64(w)/2)
@@ -123,14 +147,14 @@ func drawLayers() [][]int {
 		},
 		// 当たり判定有
 		{
-			6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+			6, 6, 6, 6, 9, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
+			6, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
 			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
@@ -186,7 +210,13 @@ func moveVector(result [2]float64, moveSpeed float64) [2]float64 {
 // 毎フレーム画面リセット(クリア),描画される
 func (g *Game) Update() error {
 	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
-	g.cols[0] = Colision{g.player2X, g.player2Y}
+
+	// interaction処理
+	if ebiten.IsKeyPressed(ebiten.KeyE) {
+		intractTo(g.iaObjs, g.player, tileSizeX, tileSizeY)
+	}
+
+	g.cols[0] = colision{g.player2X, g.player2Y}
 
 	// 最終的な移動量
 	result := [2]float64{0, 0}
@@ -198,6 +228,7 @@ func (g *Game) Update() error {
 		moveSpeed = 3.5
 	}
 
+	// 移動計算
 	for _, k := range g.keys {
 
 		beingColision := false
@@ -208,17 +239,17 @@ func (g *Game) Update() error {
 		case ebiten.KeyW:
 			for _, col := range g.cols {
 
-				if g.playerY > col.y &&
-					(g.playerY-(moveValue*moveSpeed))-col.y <= float64(tileSizeY) &&
-					g.playerX-col.x < float64(tileSizeX) &&
-					g.playerX-col.x > -float64(tileSizeX) {
+				if g.player.y > col.y &&
+					(g.player.y-(moveValue*moveSpeed))-col.y <= float64(tileSizeY) &&
+					g.player.x-col.x < float64(tileSizeX) &&
+					g.player.x-col.x > -float64(tileSizeX) {
 					colision = [2]float64{col.x, col.y}
 					beingColision = true
 				}
 			}
 
 			if beingColision {
-				moveTo := ((g.playerY - (colision[1] + float64(tileSizeY)))) / moveSpeed
+				moveTo := (g.player.y - (colision[1] + float64(tileSizeY))) / moveSpeed
 				result[1] -= moveTo
 			} else {
 				result[1] -= moveValue
@@ -226,51 +257,51 @@ func (g *Game) Update() error {
 		case ebiten.KeyA:
 			for _, col := range g.cols {
 
-				if g.playerX > col.x &&
-					(g.playerX-(moveValue*moveSpeed))-col.x <= float64(tileSizeX) &&
-					g.playerY-col.y < float64(tileSizeY) &&
-					g.playerY-col.y > -float64(tileSizeY) {
+				if g.player.x > col.x &&
+					(g.player.x-(moveValue*moveSpeed))-col.x <= float64(tileSizeX) &&
+					g.player.y-col.y < float64(tileSizeY) &&
+					g.player.y-col.y > -float64(tileSizeY) {
 					colision = [2]float64{col.x, col.y}
 					beingColision = true
 				}
 			}
 
 			if beingColision {
-				result[0] -= ((g.playerX - (colision[0] + float64(tileSizeX)))) / moveSpeed
+				result[0] -= (g.player.x - (colision[0] + float64(tileSizeX))) / moveSpeed
 			} else {
 				result[0] -= moveValue
 			}
 		case ebiten.KeyS:
 			for _, col := range g.cols {
 
-				if g.playerY < col.y &&
-					(g.playerY+(moveValue*moveSpeed))-col.y >= -float64(tileSizeY) &&
-					g.playerX-col.x < float64(tileSizeX) &&
-					g.playerX-col.x > -float64(tileSizeX) {
+				if g.player.y < col.y &&
+					(g.player.y+(moveValue*moveSpeed))-col.y >= -float64(tileSizeY) &&
+					g.player.x-col.x < float64(tileSizeX) &&
+					g.player.x-col.x > -float64(tileSizeX) {
 					colision = [2]float64{col.x, col.y}
 					beingColision = true
 				}
 			}
 
 			if beingColision {
-				result[1] -= ((g.playerY - (colision[1] - float64(tileSizeY)))) / moveSpeed
+				result[1] -= (g.player.y - (colision[1] - float64(tileSizeY))) / moveSpeed
 			} else {
 				result[1] += moveValue
 			}
 		case ebiten.KeyD:
 			for _, col := range g.cols {
 
-				if g.playerX < col.x &&
-					(g.playerX+(moveValue*moveSpeed))-col.x >= -float64(tileSizeX) &&
-					g.playerY-col.y < float64(tileSizeY) &&
-					g.playerY-col.y > -float64(tileSizeY) {
+				if g.player.x < col.x &&
+					(g.player.x+(moveValue*moveSpeed))-col.x >= -float64(tileSizeX) &&
+					g.player.y-col.y < float64(tileSizeY) &&
+					g.player.y-col.y > -float64(tileSizeY) {
 					colision = [2]float64{col.x, col.y}
 					beingColision = true
 				}
 			}
 
 			if beingColision {
-				result[0] -= ((g.playerX - (colision[0] - float64(tileSizeX)))) / moveSpeed
+				result[0] -= (g.player.x - (colision[0] - float64(tileSizeX))) / moveSpeed
 			} else {
 				result[0] += moveValue
 			}
@@ -280,8 +311,8 @@ func (g *Game) Update() error {
 	// ベクトル計算
 	resultMoved := moveVector(result, moveSpeed)
 
-	g.playerX += resultMoved[0]
-	g.playerY += resultMoved[1]
+	g.player.x += resultMoved[0]
+	g.player.y += resultMoved[1]
 	g.movedDebug = [2]float64{resultMoved[0], resultMoved[1]}
 
 	// 2p debug
@@ -363,27 +394,47 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	op.GeoM.Reset()
 
-	// 移動方向によってImageを反転
+	// キーを押していない時も反映させる必要があるため移動方向を状態保存
 	for _, key := range g.keys {
 		switch key {
+		case ebiten.KeyW:
+			g.player.lookAt = 1
 		case ebiten.KeyA:
-			g.playerLookAt = 1
+			g.player.lookAt = 2
+		case ebiten.KeyS:
+			g.player.lookAt = 3
 		case ebiten.KeyD:
-			g.playerLookAt = 2
+			g.player.lookAt = 4
 		}
 	}
 
-	switch g.playerLookAt {
+	var playerAtlas int
+
+	playerImageWidth := images[1].Bounds().Dx()/(images[1].Bounds().Dx()/16)
+	playerImageHeight := images[1].Bounds().Dy()
+
+	switch g.player.lookAt {
 	case 1:
+		playerAtlas = 1
 		op.GeoM.Scale(1, 1)
-		op.GeoM.Translate(g.playerX, g.playerY)
+		op.GeoM.Translate(g.player.x, g.player.y)
 	case 2:
+		playerAtlas = 0
+		op.GeoM.Scale(1, 1)
+		op.GeoM.Translate(g.player.x, g.player.y)
+	case 3:
+		playerAtlas = 0
+		op.GeoM.Scale(1, 1)
+		op.GeoM.Translate(g.player.x, g.player.y)
+	case 4:
+		playerAtlas = 0
 		op.GeoM.Scale(-1, 1)
-		op.GeoM.Translate(float64(images[1].Bounds().Dx())+g.playerX, g.playerY)
+		op.GeoM.Translate(float64(playerImageWidth)+g.player.x, g.player.y)
 	}
+	pickAtlas := image.Rect(playerImageWidth * playerAtlas, 0, playerImageWidth * (playerAtlas+1) ,playerImageHeight)
 
 	// Draw Player Image
-	screen.DrawImage(images[3], op)
+	screen.DrawImage(images[1].SubImage(pickAtlas).(*ebiten.Image), op)
 
 	// 2p debug
 	op.GeoM.Reset()
@@ -401,19 +452,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		op.GeoM.Translate(g.player2X, g.player2Y)
 	case 2:
 		op.GeoM.Scale(-1, 1)
-		op.GeoM.Translate(float64(images[1].Bounds().Dx())+g.player2X, g.player2Y)
+		op.GeoM.Translate(float64(playerImageWidth)+g.player2X, g.player2Y)
 	}
 
 	screen.DrawImage(images[3], op)
 
-	// box for debug colision
-	op.GeoM.Reset()
-	op.GeoM.Translate(128, 128)
-	screen.DrawImage(images[3], op)
-
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]\n2p\n[%f]\n[%f]", g.keys, g.movedDebug[0], g.movedDebug[1], g.playerX, g.playerY, g.player2X, g.player2Y))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]\n2p\n[%f]\n[%f]", g.keys, g.movedDebug[0], g.movedDebug[1], g.player.x, g.player.y, g.player2X, g.player2Y))
 
 }
 
@@ -436,15 +482,22 @@ func main() {
 	g := &Game{
 		layers:        layers,
 		keys:          []ebiten.Key{},
-		playerX:       64,
-		playerY:       48,
-		playerLookAt:  2,
 		player2X:      128,
 		player2Y:      48,
 		player2LookAt: 2,
 	}
-	g.cols = append(g.cols, Colision{g.player2X, g.player2Y})
-	g.cols = append(g.cols, Colision{128, 128})
+
+	g.player = playerData{64, 48, 2}
+
+	boxContaingEntranceKeyIa := interactiveObj{128, 48, false}
+	LockedDoorIa := interactiveObj{0, 64, false}
+
+	g.iaObjs = append(g.iaObjs,
+		boxContaingEntranceKeyIa,
+		LockedDoorIa,
+	)
+
+	g.cols = append(g.cols, colision{g.player2X, g.player2Y})
 
 	if len(layers) <= 3 {
 
@@ -455,7 +508,7 @@ func main() {
 		// layer[3]で置いたタイルをColision付objとして扱うためのappend
 		for _, t := range layers[2] {
 			if t != 0 {
-				g.cols = append(g.cols, Colision{column * float64(tileSizeX), row * float64(tileSizeY)})
+				g.cols = append(g.cols, colision{column * float64(tileSizeX), row * float64(tileSizeY)})
 			}
 			column += 1
 			if column == span {
