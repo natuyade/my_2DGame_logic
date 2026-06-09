@@ -210,7 +210,7 @@ func (g *Game) Update() error {
 
 	// interaction処理
 	if inpututil.IsKeyJustPressed(ebiten.KeyE) {
-		intractTo(g.layers, g.iaObjs, g.player, tileSizeX, tileSizeY)
+		intractTo(g, g.iaObjs, g.player, tileSizeX, tileSizeY)
 	}
 
 	// 最終的な移動量
@@ -444,22 +444,7 @@ func main() {
 	)
 
 	if len(layers) <= 3 {
-
-		span := float64(screenSizeWidth / tileSizeX)
-		row := 0.
-		column := 0.
-
-		// layer[3]で置いたタイルをColision付objとして扱うためのappend
-		for _, t := range layers[2] {
-			if t != 0 {
-				g.cols = append(g.cols, colision{column * float64(tileSizeX), row * float64(tileSizeY)})
-			}
-			column += 1
-			if column == span {
-				column = 0
-				row += 1
-			}
-		}
+		g.cols = reloadCol(layers)
 	}
 
 	// Gameのメインループを実行

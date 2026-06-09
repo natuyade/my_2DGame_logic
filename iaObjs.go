@@ -2,7 +2,7 @@ package main
 
 import _ "log"
 
-func intractTo(gmap [][]int, ias []interactiveObj, pd playerData, tileSizeX int, tileSizeY int) ([][]int, []interactiveObj) {
+func intractTo(g *Game, ias []interactiveObj, pd playerData, tileSizeX int, tileSizeY int) {
 	pReach := 2.
 	tx := float64(tileSizeX)
 	ty := float64(tileSizeY)
@@ -14,49 +14,52 @@ func intractTo(gmap [][]int, ias []interactiveObj, pd playerData, tileSizeX int,
 				ia.x-pd.x >= -tx/2 &&
 				ia.y-pd.y <= -ty &&
 				ia.y-pd.y >= -(ty+pReach) {
-				gmap, ias[i].used = intEvent(gmap, i, ia.used)
+				ias[i].used = intEvent(g, i, ia.used)
 			}
 		case 2:
 			if ia.y-pd.y <= ty/2 &&
 				ia.y-pd.y >= -ty/2 &&
 				ia.x-pd.x <= -tx &&
 				ia.x-pd.x >= -(tx+pReach) {
-				gmap, ias[i].used = intEvent(gmap, i, ia.used)
+				ias[i].used = intEvent(g, i, ia.used)
 			}
 		case 3:
 			if ia.x-pd.x <= tx/2 &&
 				ia.x-pd.x >= -tx/2 &&
 				ia.y-pd.y >= ty &&
 				ia.y-pd.y <= ty+pReach {
-				gmap, ias[i].used = intEvent(gmap, i, ia.used)
+				ias[i].used = intEvent(g, i, ia.used)
 			}
 		case 4:
 			if ia.y-pd.y <= ty/2 &&
 				ia.y-pd.y >= -ty/2 &&
 				ia.x-pd.x >= tx &&
 				ia.x-pd.x <= tx+pReach {
-				gmap, ias[i].used = intEvent(gmap, i, ia.used)
+				ias[i].used = intEvent(g, i, ia.used)
 			}
 		}
 	}
-
-	return gmap, ias
 }
 
 // インタラクトされたobjに対応する処理
-func intEvent(gmap [][]int, id int, used bool) ([][]int, bool) {
+func intEvent(g *Game, id int, used bool) bool {
 	switch id {
 	// boxContaingEntranceKey
 	case 0:
 		if !used {
-			gmap[2][42] = 12
+			g.layers[2][42] = 12
+			return true
 		}
 	// LockedDoor
 	case 1:
 		if !used {
-			gmap[2][4] = 10
+			g.layers[2][4] = 0
+			g.layers[1][4] = 10
+
+			g.cols = reloadCol(g.layers)
+			return true
 		}
 	}
 
-	return gmap, used
+	return used
 }
