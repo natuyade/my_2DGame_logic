@@ -1,8 +1,11 @@
 package main
 
-import _ "log"
+import (
+	"log"
+	_ "log"
+)
 
-func intractTo(g *Game, ias []interactiveObj, pd playerData, tileSizeX int, tileSizeY int) {
+func intractTo(g *Game, ias []interactiveObj, pd playerData) {
 	pReach := 2.
 	tx := float64(tileSizeX)
 	ty := float64(tileSizeY)
@@ -50,15 +53,27 @@ func intEvent(g *Game, id int, used bool) bool {
 			g.layers[2][42] = 12
 			return true
 		}
+		log.Println("already opened")
 	// LockedDoor
 	case 1:
 		if !used {
-			g.layers[2][4] = 0
-			g.layers[1][4] = 10
+			g.layers[2][20] = 0
+			g.layers[1][20] = 10
 
 			g.cols = reloadCol(g.layers)
 			return true
 		}
+	// firstSign
+	case 2:
+		if !used {
+			g.message = append(g.message, 
+				"The story starts here.",
+			)
+			return true
+		}
+		g.message = append(g.message, 
+			"The story starts here.\n(read)",
+		)
 	}
 
 	return used

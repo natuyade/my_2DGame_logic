@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
 	"image"
 	_ "image/png"
@@ -10,9 +12,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
-
-var images []*ebiten.Image
 
 const (
 	windowWidth  = int(1280)
@@ -26,18 +27,19 @@ const (
 )
 
 type Game struct {
-	layers        [][]int
-	keys          []ebiten.Key
-	player        playerData
-	movedDebug    [2]float64
-	cols          []colision
-	iaObjs        []interactiveObj
-	frags         eventFrags
+	layers     [][]int
+	keys       []ebiten.Key
+	player     playerData
+	movedDebug [2]float64
+	cols       []colision
+	iaObjs     []interactiveObj
+	frags      eventFrags
+	message    []string
 }
 
 type playerData struct {
-	x float64
-	y float64
+	x      float64
+	y      float64
 	lookAt int
 }
 
@@ -47,14 +49,20 @@ type colision struct {
 }
 
 type interactiveObj struct {
-	x float64
-	y float64
+	x    float64
+	y    float64
 	used bool
 }
 
 type eventFrags struct {
 	entranceKey bool
 }
+
+var images []*ebiten.Image
+
+//go:embed unifont-17.0.03.otf
+var uniFont []byte
+var japaneseFaceSource *text.GoTextFaceSource
 
 func loadImage(path string) *ebiten.Image {
 	// NewImageFromFile(相対パス): 画像ファイルから再利用可能なebitengineImageObjectを生成
@@ -66,20 +74,20 @@ func loadImage(path string) *ebiten.Image {
 }
 
 func init() {
+	// text font
+	s, err := text.NewGoTextFaceSource(bytes.NewReader(uniFont))
+	if err != nil {
+		log.Fatal(err)
+	}
+	japaneseFaceSource = s
+
+	// images
 	fishImg := loadImage("assets/images/fishish.png")
 	playerImg := loadImage("assets/images/player.png")
 	tilesImg := loadImage("assets/images/tiles.png")
 	boxImg := loadImage("assets/images/box.png")
 
 	images = append(images, fishImg, playerImg, tilesImg, boxImg)
-}
-
-func inputIaObj(objs []interactiveObj) {
-
-	objs = append(objs,
-		interactiveObj{x: 0,y: 0, used: false},//
-		interactiveObj{x: 0,y: 1, used: false},
-	)
 }
 
 func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
@@ -97,70 +105,12 @@ func objRotate(img *ebiten.Image, angle float64) *ebiten.DrawImageOptions {
 
 	// 原点で回転する為, 移動後の画像の中心を原点に移動し回転することで
 	// 回転後の座標計算をなくせる
-	op.GeoM.Rotate(angle)        
+	op.GeoM.Rotate(angle)
 
 	// 左上基準に戻す
 	op.GeoM.Translate(float64(w)/2, float64(w)/2)
 
 	return op
-}
-
-func drawLayers() [][]int {
-
-	layers := [][]int{
-		// 地面
-		{
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2,
-		},
-		// 当たり判定無しobj
-		{
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		},
-		// 当たり判定有
-		{
-			6, 6, 6, 6, 9, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6,
-			6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-		},
-	}
-	return layers
 }
 
 func convertDir(pickedNum int) [2]int {
@@ -208,9 +158,16 @@ func moveVector(result [2]float64, moveSpeed float64) [2]float64 {
 func (g *Game) Update() error {
 	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
 
+	if len(g.message) > 0 {
+		if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
+			g.message = g.message[1:]
+		}
+		return nil
+	}
+
 	// interaction処理
 	if inpututil.IsKeyJustPressed(ebiten.KeyE) {
-		intractTo(g, g.iaObjs, g.player, tileSizeX, tileSizeY)
+		intractTo(g, g.iaObjs, g.player)
 	}
 
 	// 最終的な移動量
@@ -221,6 +178,20 @@ func (g *Game) Update() error {
 	// Sprintの倍率
 	if ebiten.IsKeyPressed(ebiten.KeyShiftLeft) {
 		moveSpeed = 3.5
+	}
+
+	// キーを押していない時もプレイヤーの向きを保存
+	for _, key := range g.keys {
+		switch key {
+		case ebiten.KeyW:
+			g.player.lookAt = 1
+		case ebiten.KeyA:
+			g.player.lookAt = 2
+		case ebiten.KeyS:
+			g.player.lookAt = 3
+		case ebiten.KeyD:
+			g.player.lookAt = 4
+		}
 	}
 
 	// 移動計算
@@ -364,23 +335,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	op.GeoM.Reset()
 
-	// キーを押していない時も反映させる必要があるため移動方向を状態保存
-	for _, key := range g.keys {
-		switch key {
-		case ebiten.KeyW:
-			g.player.lookAt = 1
-		case ebiten.KeyA:
-			g.player.lookAt = 2
-		case ebiten.KeyS:
-			g.player.lookAt = 3
-		case ebiten.KeyD:
-			g.player.lookAt = 4
-		}
-	}
-
 	var playerAtlas int
 
-	playerImageWidth := images[1].Bounds().Dx()/(images[1].Bounds().Dx()/16)
+	playerImageWidth := images[1].Bounds().Dx() / (images[1].Bounds().Dx() / 16)
 	playerImageHeight := images[1].Bounds().Dy()
 
 	switch g.player.lookAt {
@@ -401,10 +358,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		op.GeoM.Scale(-1, 1)
 		op.GeoM.Translate(float64(playerImageWidth)+g.player.x, g.player.y)
 	}
-	pickAtlas := image.Rect(playerImageWidth * playerAtlas, 0, playerImageWidth * (playerAtlas+1) ,playerImageHeight)
+	pickAtlas := image.Rect(playerImageWidth*playerAtlas, 0, playerImageWidth*(playerAtlas+1), playerImageHeight)
 
 	// Draw Player Image
 	screen.DrawImage(images[1].SubImage(pickAtlas).(*ebiten.Image), op)
+
+	// Draw Message
+	if len(g.message) > 0 {
+		drawMessage(screen, g.message[0])
+	}
 
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
@@ -429,23 +391,16 @@ func main() {
 	layers := drawLayers()
 
 	g := &Game{
-		layers:        layers,
-		keys:          []ebiten.Key{},
+		layers: layers,
+		keys:   []ebiten.Key{},
 	}
 
 	g.player = playerData{64, 48, 2}
 
-	boxContaingEntranceKeyIa := interactiveObj{160, 32, false}
-	LockedDoorIa := interactiveObj{64, 0, false}
+	g.iaObjs = inputIaObj()
 
-	g.iaObjs = append(g.iaObjs,
-		boxContaingEntranceKeyIa,
-		LockedDoorIa,
-	)
-
-	if len(layers) <= 3 {
-		g.cols = reloadCol(layers)
-	}
+	// コリジョン
+	g.cols = reloadCol(layers)
 
 	// Gameのメインループを実行
 	if err := ebiten.RunGame(g); err != nil {
