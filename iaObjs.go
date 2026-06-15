@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	_ "log"
 )
 
@@ -51,9 +50,10 @@ func intEvent(g *Game, id int, used bool) bool {
 	case 0:
 		if !used {
 			g.layers[2][42] = 12
+			g.message = append(g.message, "You found the entrance key.")
 			return true
 		}
-		log.Println("already opened")
+		g.message = append(g.message, "The box is already open.")
 	// LockedDoor
 	case 1:
 		if !used {
@@ -66,14 +66,10 @@ func intEvent(g *Game, id int, used bool) bool {
 	// firstSign
 	case 2:
 		if !used {
-			g.message = append(g.message, 
-				"The story starts here.",
-			)
+			g.message = append(g.message, "The story begins here.")
 			return true
 		}
-		g.message = append(g.message, 
-			"The story starts here.\n(read)",
-		)
+		g.message = append(g.message, "The story begins here.\n(read)")
 	}
 
 	return used
