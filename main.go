@@ -35,6 +35,12 @@ type Game struct {
 	iaObjs     []interactiveObj
 	frags      eventFrags
 	message    []string
+	items	   []item
+}
+
+type item struct {
+	id int
+	amount int
 }
 
 type playerData struct {
@@ -367,10 +373,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if len(g.message) > 0 {
 		drawMessage(screen, g.message[0])
 	}
+	havingItem := []int{}
+	for _, item := range g.items {
+		if item.amount > 0 {
+			havingItem = append(havingItem, item.id)
+		}
+	}
 
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]", g.keys, g.movedDebug[0], g.movedDebug[1], g.player.x, g.player.y))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]\n%v", g.keys, g.movedDebug[0], g.movedDebug[1], g.player.x, g.player.y, havingItem))
 
 }
 
@@ -398,6 +410,7 @@ func main() {
 	g.player = playerData{64, 48, 2}
 
 	g.iaObjs = inputIaObj()
+	g.items = inputItems()
 
 	// コリジョン
 	g.cols = reloadCol(layers)

@@ -50,26 +50,34 @@ func intEvent(g *Game, id int, used bool) bool {
 	case 0:
 		if !used {
 			g.layers[2][42] = 12
-			g.message = append(g.message, "You found the entrance key.")
+			g.items[0].amount += 1
+			g.message = append(g.message, "入口のカギを見つけた")
 			return true
 		}
-		g.message = append(g.message, "The box is already open.")
+		g.message = append(g.message, "もうなにも入っていない")
 	// LockedDoor
 	case 1:
 		if !used {
+			if g.items[0].amount == 0 {
+				g.message = append(g.message, "鍵がかかっている")
+				return false
+			}
+			g.items[0].amount -= 1
+			
 			g.layers[2][20] = 0
 			g.layers[1][20] = 10
 
 			g.cols = reloadCol(g.layers)
+			g.message = append(g.message, "鍵が開いた")
 			return true
 		}
 	// firstSign
 	case 2:
 		if !used {
-			g.message = append(g.message, "The story begins here.")
+			g.message = append(g.message, "始まりの地\n(Spaceでメッセージを進める)")
 			return true
 		}
-		g.message = append(g.message, "The story begins here.\n(read)")
+		g.message = append(g.message, "始まりの地")
 	}
 
 	return used

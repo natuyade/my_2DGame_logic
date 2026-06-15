@@ -9,4 +9,4 @@ func inputIaObj() []interactiveObj {
 	)
 	
 	return objs
-} 
+}
