@@ -27,15 +27,16 @@ const (
 )
 
 type Game struct {
-	layers     [][]int
-	keys       []ebiten.Key
-	player     playerData
-	movedDebug [2]float64
-	cols       []colision
-	iaObjs     []interactiveObj
-	frags      eventFrags
-	message    []string
-	items	   []item
+	currentStage 	int
+	layers			[][]int
+	keys       		[]ebiten.Key
+	player     		playerData
+	movedDebug 		[2]float64
+	cols       		[]colision
+	iaObjs     		[]interactiveObj
+	frags      		eventFrags
+	message    		[]string
+	items	   		[]item
 }
 
 type item struct {
@@ -382,7 +383,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// 画面上にdebugメッセージを描画するutility関数
 	// 毎フレーム画面はクリアされるためDrawで毎フレーム描画する必要がある
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]\n%v", g.keys, g.movedDebug[0], g.movedDebug[1], g.player.x, g.player.y, havingItem))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("%s\nmoved: x[%f] y[%f]\n1p\n[%f]\n[%f]\nitems: %v", g.keys, g.movedDebug[0], g.movedDebug[1], g.player.x, g.player.y, havingItem))
 
 }
 
@@ -400,20 +401,20 @@ func main() {
 	// windowTitle
 	ebiten.SetWindowTitle("My first app in go language")
 
-	layers := drawLayers()
+	g := &Game{}
 
-	g := &Game{
-		layers: layers,
-		keys:   []ebiten.Key{},
-	}
+	g.keys = []ebiten.Key{}
 
 	g.player = playerData{64, 48, 2}
+
+	g.currentStage = 1
+	g.layers = drawLayers(g.currentStage)
 
 	g.iaObjs = inputIaObj()
 	g.items = inputItems()
 
 	// コリジョン
-	g.cols = reloadCol(layers)
+	g.cols = reloadCol(g.layers)
 
 	// Gameのメインループを実行
 	if err := ebiten.RunGame(g); err != nil {
