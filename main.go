@@ -28,12 +28,12 @@ const (
 
 type Game struct {
 	currentStage 	int
-	layers			[][]int
+	layers			[][][]int
 	keys       		[]ebiten.Key
 	player     		playerData
 	movedDebug 		[2]float64
 	cols       		[]colision
-	iaObjs     		[]interactiveObj
+	iaObjs     		[][]interactiveObj
 	frags      		eventFrags
 	message    		[]string
 	items	   		[]item
@@ -165,11 +165,19 @@ func moveVector(result [2]float64, moveSpeed float64) [2]float64 {
 func (g *Game) Update() error {
 	g.keys = inpututil.AppendPressedKeys(g.keys[:0])
 
+	// メッセージを優先的に処理するため,interact処理の前に
 	if len(g.message) > 0 {
 		if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 			g.message = g.message[1:]
 		}
 		return nil
+	}
+	
+	// stage Debug用
+	for _, key := range g.keys {
+		if key >= ebiten.Key0 && key <= ebiten.Key9 {
+			stageChange(g, int(key-ebiten.Key0))
+		}
 	}
 
 	// interaction処理
@@ -305,7 +313,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screenSizeX := screen.Bounds().Dx()
 	tileSpan := screenSizeX / tileSizeX
 
-	for _, y := range g.layers {
+	for _, y := range g.layers[g.currentStage] {
 		for _, x := range y {
 			tileId := x
 			// 0の場合描画しないようにするため-1(tile描画を1~に)
@@ -407,14 +415,14 @@ func main() {
 
 	g.player = playerData{64, 48, 2}
 
-	g.currentStage = 1
-	g.layers = drawLayers(g.currentStage)
+	g.currentStage = 0
+	g.layers = drawLayers()
 
 	g.iaObjs = inputIaObj()
 	g.items = inputItems()
 
 	// コリジョン
-	g.cols = reloadCol(g.layers)
+	g.cols = reloadCol(g.layers[g.currentStage])
 
 	// Gameのメインループを実行
 	if err := ebiten.RunGame(g); err != nil {
